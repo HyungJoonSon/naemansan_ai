@@ -4,7 +4,32 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from haversine import haversine
 
-
+def transform_vector(user_vector, db_vector):
+    N, _ = user_vector.shape
+    M, _ = db_vector.shape
+    K = min(N, M)
+    Q = max(N, M)
+    if K==N :
+        vector = db_vector
+    else : 
+        vector = user_vector
+    selected_indices = [0]  
+    for i in range(1, K - 1):
+        idx = int((i / (K - 1)) * (Q - 1)) + 1
+        selected_indices.append(idx)
+    
+    selected_indices.append(K - 1)  
+    
+    
+    transformed_vector = vector[selected_indices]
+    
+    if N == M :
+        return user_vector, db_vector
+    if N > M:
+        return transformed_vector, db_vector
+    else:
+        return transformed_vector, user_vector
+    
 class  similarity_Checker():
     def calculate_Similarity(self, input_coord) :
         # 두 산책로의 유사도가 높으면 false/true를 반환 하는 함수
@@ -34,6 +59,9 @@ class  similarity_Checker():
         user_frame.iloc[:, 1] = (user_frame.iloc[:, 1] - Y_mean) / Y_std
         user_std = user_frame.values
 
+        # 스타팅 포인트
+        user_starting_std = user_std[0][:]
+
         # DB연결
         conn = pymysql.connect(host="localhost", user="root", password="1234", db="naemansan")
 
@@ -59,13 +87,13 @@ class  similarity_Checker():
             row = row.replace(",", " ")
             temp = row.split()
             float_coord = []
-            for i in temp[::-1]: 
+            for i in temp[::-1]: # 여기가 반대[::-1]
                 float_coord.append(float(i))
             coordinates_list.append(float_coord)
 
         # 좌표를 데이터프레임으로 변환
         walking_Path = pd.DataFrame(coordinates_list)
-        
+
         # 산책로 마다 데이터프레임으로 변환
         X, Y = walking_Path.shape
         for i in range(X):
@@ -75,30 +103,51 @@ class  similarity_Checker():
             walking_list = walking_list.reshape(-1, 2)
             temp_frame = pd.DataFrame(walking_list)
             temp_frame = temp_frame.dropna(axis=1)
+            original_frame = temp_frame.copy()
 
             # 정규화
-            temp_frame.iloc[:, 0] = (temp_frame.iloc[:, 0] - X_mean) / X_std
+            temp_frame.iloc[:, 0] = (temp_frame.iloc[:, 0] - X_mean) / X_std 
             temp_frame.iloc[:, 1] = (temp_frame.iloc[:, 1] - Y_mean) / Y_std
+            DB_std = temp_frame.values
+            DB_starting_std = temp_frame.iloc[0].values
+            
+
+            #user_final = np.delete(user_result, 0, axis=0)
+            #DB_final = np.delete(DB_result, 0, axis=0)
 
             # 유사도 벡터와 점수
-            walking_std = temp_frame.values
-            DB_XY = np.mean(walking_std, axis=0)
-            DB_X = DB_XY[0] * X_std + X_mean
-            DB_Y = DB_XY[1] * Y_std + Y_mean
-            DB_coord = (DB_X, DB_Y)
+            DB_XY = np.mean(original_frame, axis=0)
+            DB_coord = (DB_XY[:][0], DB_XY[:][1])
             distance = haversine(user_XY, DB_coord)
-            similarity_vector = cosine_similarity(walking_std, user_std)
-            similarity_score = np.mean(np.max(similarity_vector, axis=0))
+            if distance >= 0.3 :
+                continue
+            left_vector, right_vector = transform_vector(user_std, DB_std)
 
+
+            disp_left = (np.zeros((1,2)) - (left_vector[0,0],left_vector[0,1]))
+            disp_right = (np.zeros((1,2)) - (right_vector[0,0],right_vector[0,1]))
+            left_vector[:,0] += disp_left[0][0]
+            left_vector[:,1] += disp_left[0][1]
+            right_vector[:,0] += disp_right[0][0]
+            right_vector[:,1] += disp_right[0][1]
+
+            left_vector = left_vector[1:]
+            right_vector = right_vector[1:]
+
+            similarity_vector = cosine_similarity(left_vector, right_vector)
+            similarity_size = similarity_vector.shape[0]
+
+            similarity_score = np.trace((similarity_vector)) / similarity_size
+            #print(similarity_vector)
+
+            
             # threshold -> 0.975 (나중에 바뀔수도..??)
-            threshold = 0.9985
+            threshold = 0.95
 
             # 유사도가 높으면 반복문 멈추고 등록 불가
             # 산책로의 좌표가 길면 유사도 벡터가 점점 희소해지는 문제를 벡터 열의 max값만 사용
             # 벡터 열의 max값을 이용한다는 것의 의미는 A 산책로의 한 좌표와 제일 가까운 B 산책로의 한 좌표와의 유사도를 의미
-            if ((np.any(np.isclose(similarity_vector, 1.0)) and (
-                similarity_score > threshold or similarity_score < -threshold
-            )) or np.all(np.isclose(np.diag(similarity_vector), 1.0))) and distance < 0.3 :
+            if (similarity_score > threshold or similarity_score < -threshold) and distance < 0.3 :
                 return token_false
 
         return token_true
