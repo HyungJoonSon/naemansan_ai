@@ -63,7 +63,7 @@ class  similarity_Checker():
         user_starting_std = user_std[0][:]
 
         # DB연결
-        conn = pymysql.connect(host="localhost", user="root", password="1234", db="naemansan")
+        conn = pymysql.connect(host="172.20.0.5", user="root", password="1234", db="naemansan")
 
         cursor = conn.cursor()
 
@@ -139,6 +139,9 @@ class  similarity_Checker():
 
             similarity_score = np.trace((similarity_vector)) / similarity_size
             #print(similarity_vector)
+            print(similarity_score)
+            print("--------------------------")
+            print(similarity_vector)
 
             
             # threshold -> 0.975 (나중에 바뀔수도..??)

@@ -63,7 +63,7 @@ class  finish_Checker():
         user_std = user_frame.values
 
         # DB연결
-        conn = pymysql.connect(host="localhost", user="root", password="1234", db="naemansan")
+        conn = pymysql.connect(host="172.20.0.5", user="root", password="1234", db="naemansan")
 
         cursor = conn.cursor()
 
@@ -149,5 +149,3 @@ class  finish_Checker():
                 return token_true
 
         return token_false
-
-
