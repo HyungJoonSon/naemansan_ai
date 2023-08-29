@@ -25,7 +25,7 @@ class course_recommender():
     def __init__(self, user_id = int) :
         self.user_id = user_id # json에서 갖고온 유저의 ID
 
-        self.model = Word2Vec.load(".\\recommender\word2vec.model") # 미리 학습한 word2Vec 모델 load
+        self.model = Word2Vec.load("./recommender/word2vec.model") # 미리 학습한 word2Vec 모델 load
 
         self.best = 3 # 몇 개의 산책로를 추천할 것인지
 
@@ -53,13 +53,13 @@ class course_recommender():
     def recommend(self):
         id_input = self.user_id
         
-        conn = pymysql.connect(host="localhost", user="root", password="1234", db="naemansan")
+        conn = pymysql.connect(host="172.20.0.5", user="root", password="1234", db="naemansan")
         
         cursor = conn.cursor()
 
         # DB에서 특정 사용자가 이용한 산책로의 id와 완주 여부를 갖고온다.
         query = """
-        SELECT course_id, finish_status  
+        SELECT course_id, is_finished  
         FROM using_courses 
         WHERE user_id = %d""" % (id_input) 
         cursor.execute(query)
@@ -99,8 +99,9 @@ class course_recommender():
 
         # 사용자 vector와 전체 산책로의 유사도 점수 계산
         query = """
-        SELECT tag, course_id 
-        FROM course_tags
+        SELECT t.name, c.course_id
+        FROM course_tags as c inner join tags as t
+        WHERE c.tag_id=t.id
         """ 
         cursor.execute(query)
         results = cursor.fetchall()
