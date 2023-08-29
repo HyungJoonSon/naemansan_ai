@@ -82,9 +82,9 @@ class course_recommender():
         # 해당 산책로를 완주했을 시에는 한번 더 더한다.
         for idx, co_id in enumerate(course_list) :
             query = """
-            SELECT tag 
-            FROM course_tags 
-            WHERE course_id = %d""" % (co_id)
+            SELECT t.name
+            FROM course_tags as c inner join tags as t
+            WHERE c.tag_id =t.id and c.course_id = %d""" % (co_id)
             cursor.execute(query)
             results = cursor.fetchall()
 
